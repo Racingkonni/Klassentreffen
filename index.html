@@ -15,7 +15,12 @@
 </style>
 </head>
 <body>
-<header class="top" id="album-header" hidden><div class="brand"><span class="mark" aria-hidden="true">K</span><div>UNSER KLASSENALBUM<small>Erinnerungen, die bleiben.</small></div></div></header>
+<header class="top" id="album-header" hidden><div class="brand"><span class="mark" aria-hidden="true">K</span><div>UNSER KLASSENALBUM<small>Erinnerungen, die bleiben.</small></div></div><button class="outline" id="logout" type="button">Abmelden</button></header>
+<section class="login-wrap" id="login-view" aria-labelledby="login-title">
+<img class="login-school" src="https://raw.githubusercontent.com/Racingkonni/Klassentreffen/main/images/Webschule.jpg" alt="Unser Schulgebäude">
+<div class="login-box"><h1 id="login-title">Klasse 1a</h1><p class="hint">Melde dich mit deiner E-Mail-Adresse und deinem Passwort an.</p>
+<form id="login-form"><label class="field" for="email">E-Mail-Adresse<input id="email" name="email" type="email" autocomplete="username" required></label><label class="field" for="password">Passwort<input id="password" name="password" type="password" autocomplete="current-password" required></label><button class="primary" id="login-button" type="submit" disabled>Album öffnen →</button></form>
+<p class="hint" id="auth-status" role="status">Anmeldung wird geladen …</p><p class="error" id="login-error" role="alert"></p><noscript>Bitte aktiviere JavaScript, um dich anzumelden.</noscript></div></section>
 
 <main class="main" id="album-view" hidden><div class="heading"><div><div class="eyebrow">Gemeinsam zurückblättern</div><h1>Unser Klassenalbum</h1></div><span class="album-total" id="total"></span></div><nav class="tabs" id="tabs" role="tablist" aria-label="Fotoalben"></nav><section id="panel" role="tabpanel" tabindex="0"><div class="section-head"><div><h2 id="album-title"></h2><p id="album-description"></p></div><p id="count"></p></div><nav id="subalbums" class="subalbums" aria-label="Orte beim Klassentreffen 2025" hidden></nav><div class="grid" id="gallery"></div></section><footer class="footer"><span>Klassentreffen · Unser gemeinsames Fotoalbum</span></footer></main>
 <dialog id="lightbox" aria-labelledby="lightbox-title"><div class="dialog-top"><h2 id="lightbox-title"></h2><button class="close" id="close-lightbox">Schließen ×</button></div><div id="profile-content"><img id="large-image" alt=""></div></dialog><div class="toast" id="toast" role="status" hidden></div>
@@ -34,7 +39,79 @@ if(document.modelContext?.registerTool){const lifecycle=new AbortController();ad
 
 
 $('lightbox').addEventListener('close',()=>{$('large-image').removeAttribute('src');});
-openAlbum();
+// Firebase checks the login. Public image URLs remain publicly accessible.
+const firebaseConfig = {
+  apiKey: "AIzaSyDavFy9GIG9XUB01vEIcKq0r9d0Lm2IkxI",
+  authDomain: "bierwanderung-live.firebaseapp.com",
+  databaseURL: "https://bierwanderung-live-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "bierwanderung-live",
+  storageBucket: "bierwanderung-live.firebasestorage.app",
+  messagingSenderId: "216012446890",
+  appId: "1:216012446890:web:5a07c3c2c42b461d8004d3",
+  measurementId: "G-RVQ3ZEVCBB"
+};
+function authError(error) {
+  const messages = {
+    'auth/invalid-credential': 'E-Mail-Adresse oder Passwort stimmt nicht.',
+    'auth/user-not-found': 'E-Mail-Adresse oder Passwort stimmt nicht.',
+    'auth/wrong-password': 'E-Mail-Adresse oder Passwort stimmt nicht.',
+    'auth/invalid-email': 'Bitte gib eine gültige E-Mail-Adresse ein.',
+    'auth/user-disabled': 'Dieses Benutzerkonto wurde deaktiviert.',
+    'auth/too-many-requests': 'Zu viele Versuche. Bitte versuche es später erneut.',
+    'auth/network-request-failed': 'Keine Verbindung zu Firebase. Bitte prüfe deine Internetverbindung.',
+    'auth/operation-not-allowed': 'Die Anmeldung mit E-Mail und Passwort ist im Firebase-Projekt nicht aktiviert.'
+  };
+  return messages[error.code] || 'Die Anmeldung ist momentan nicht möglich. Bitte lade die Seite erneut.';
+}
+async function setupAuth() {
+  try {
+    const [{initializeApp}, {getAuth, setPersistence, browserSessionPersistence, onAuthStateChanged, signInWithEmailAndPassword, signOut}] = await Promise.all([
+      import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js'),
+      import('https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js')
+    ]);
+    const auth = getAuth(initializeApp(firebaseConfig));
+    await setPersistence(auth, browserSessionPersistence);
+    $('login-form').onsubmit = async event => {
+      event.preventDefault();
+      $('login-button').disabled = true;
+      $('login-error').textContent = '';
+      $('auth-status').textContent = 'Anmeldung wird geprüft …';
+      try {
+        await signInWithEmailAndPassword(auth, $('email').value.trim(), $('password').value);
+        $('password').value = '';
+      } catch (error) {
+        $('login-error').textContent = authError(error);
+      } finally {
+        $('login-button').disabled = false;
+        $('auth-status').textContent = '';
+      }
+    };
+    $('logout').onclick = async () => {
+      $('logout').disabled = true;
+      try { await signOut(auth); }
+      catch (error) { $('toast').textContent = 'Abmelden fehlgeschlagen. Bitte versuche es erneut.'; $('toast').hidden = false; }
+      finally { $('logout').disabled = false; }
+    };
+    onAuthStateChanged(auth, user => {
+      $('login-view').hidden = Boolean(user);
+      $('album-header').hidden = !user;
+      $('album-view').hidden = !user;
+      $('auth-status').textContent = '';
+      $('login-button').disabled = false;
+      $('toast').hidden = true;
+      if (user) { openAlbum(); }
+      else {
+        $('gallery').replaceChildren();
+        $('lightbox').close();
+        $('password').value = '';
+      }
+    }, error => { $('login-error').textContent = authError(error); });
+  } catch (error) {
+    $('auth-status').textContent = '';
+    $('login-error').textContent = 'Firebase konnte nicht geladen werden. Bitte prüfe deine Internetverbindung und lade die Seite erneut.';
+  }
+}
+setupAuth();
 </script>
 </body>
 </html>
