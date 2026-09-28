@@ -13,6 +13,7 @@
 .login-wrap{display:grid;grid-template-columns:1.4fr 1fr;max-width:1040px;margin:clamp(24px,10vh,100px) auto;align-items:stretch}.login-school{display:block;width:100%;height:100%;min-height:480px;object-fit:cover}.login-box{display:flex;flex-direction:column;justify-content:center;background:white}.grid.wide .image-only{grid-template-columns:1fr}.image-only .image-button{height:auto;min-height:250px}.image-only .image-button img{height:auto;max-height:560px}@media(max-width:700px){.login-wrap{grid-template-columns:1fr;max-width:460px;margin:24px auto}.login-school{height:250px;min-height:0;object-position:center}.login-box{padding:28px}.login-box h1{margin-bottom:15px}}
 .upload-actions input[type=file]{max-width:100%;font-size:.8rem;padding:8px}.upload-actions .primary{margin-top:8px;font-size:.82rem}.attachment{display:block;overflow-wrap:anywhere;font-size:.85rem;margin-top:10px}.upload-actions .field{margin-top:0}
 .profile-caption{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:16px 18px;background:white}.profile-caption strong{font-size:1rem}.pdf-link{display:inline-block;padding:9px 13px;border:1px solid #c4ceda;border-radius:6px;font-size:.85rem;text-decoration:none;font-weight:600}.pdf-link:hover{background:#eef3fa}.pdf-library{margin-top:32px;padding:20px;background:white;border:1px solid var(--line);border-radius:10px}.pdf-library summary{cursor:pointer;font-weight:650}.pdf-library nav{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+#lightbox.with-pdf{width:min(1180px,95vw)}#profile-content{display:grid;gap:20px;align-items:start}#lightbox.with-pdf #profile-content{grid-template-columns:minmax(220px,1fr) minmax(320px,1.6fr)}#lightbox.with-pdf #large-image{max-width:100%;max-height:72vh;width:100%;object-fit:contain}.profile-pdf iframe{display:block;width:100%;height:68vh;border:0;border-radius:6px;background:white}.profile-pdf .pdf-link{color:white;margin-bottom:12px}.profile-pdf p{font-size:.85rem;line-height:1.5;color:#ced6e2;margin-bottom:12px}@media(max-width:700px){#lightbox.with-pdf #profile-content{grid-template-columns:1fr}#lightbox.with-pdf #large-image{max-height:30vh}.profile-pdf iframe{height:60vh}}
 </style>
 </head>
 <body>
@@ -24,7 +25,7 @@
 <p class="hint" id="auth-status" role="status">Anmeldung wird geladen …</p><p class="error" id="login-error" role="alert"></p><noscript>Bitte aktiviere JavaScript, um dich anzumelden.</noscript></div></section>
 
 <main class="main" id="album-view" hidden><div class="heading"><div><div class="eyebrow">Gemeinsam zurückblättern</div><h1>Unser Klassenalbum</h1></div><span class="album-total" id="total"></span></div><nav class="tabs" id="tabs" role="tablist" aria-label="Fotoalben"></nav><section id="panel" role="tabpanel" tabindex="0"><div class="section-head"><div><h2 id="album-title"></h2><p id="album-description"></p></div><p id="count"></p></div><nav id="subalbums" class="subalbums" aria-label="Orte beim Klassentreffen 2025" hidden></nav><div class="grid" id="gallery"></div></section><footer class="footer"><span>Klassentreffen · Unser gemeinsames Fotoalbum</span></footer></main>
-<dialog id="lightbox" aria-labelledby="lightbox-title"><div class="dialog-top"><h2 id="lightbox-title"></h2><button class="close" id="close-lightbox">Schließen ×</button></div><div id="profile-content"><img id="large-image" alt=""></div></dialog><div class="toast" id="toast" role="status" hidden></div>
+<dialog id="lightbox" aria-labelledby="lightbox-title"><div class="dialog-top"><h2 id="lightbox-title"></h2><button class="close" id="close-lightbox">Schließen ×</button></div><div id="profile-content"><img id="large-image" alt=""><section class="profile-pdf" id="profile-pdf" aria-label="PDF zum Schülerprofil" hidden></section></div></dialog><div class="toast" id="toast" role="status" hidden></div>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);let albums=[],active='portraits';let activeSub='park';
@@ -33,14 +34,34 @@ const descriptions={portraits:'Unsere Schulklasse von 1992.',einschulung:'Der er
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
 async function openAlbum(){albums=albumData;$('album-header').hidden=false;$('album-view').hidden=false;$('total').textContent=albums.reduce((sum,a)=>sum+a.images.length,0)+' Bilder · '+albums.length+' Alben';$('tabs').replaceChildren();for(const a of albums){const b=el('button','tab',a.label);b.id='tab-'+a.id;b.setAttribute('role','tab');b.setAttribute('aria-controls','panel');b.onclick=()=>selectAlbum(a.id);b.onkeydown=e=>{const keys=['ArrowLeft','ArrowRight','Home','End'];if(!keys.includes(e.key))return;e.preventDefault();const i=albums.findIndex(x=>x.id===a.id);const next=e.key==='Home'?0:e.key==='End'?albums.length-1:(i+(e.key==='ArrowRight'?1:-1)+albums.length)%albums.length;selectAlbum(albums[next].id);$('tab-'+albums[next].id).focus();};$('tabs').append(b);}selectAlbum(active);}
 function selectAlbum(id,subId){const a=albums.find(a=>a.id===id);if(!a)throw Error('Unbekanntes Album.');if(subId&&!a.children?.some(c=>c.id===subId))throw Error('Unbekanntes Unteralbum.');active=id;if(subId)activeSub=subId;for(const x of albums){const b=$('tab-'+x.id);b.setAttribute('aria-selected',String(x.id===id));b.tabIndex=x.id===id?0:-1;}$('panel').setAttribute('aria-labelledby','tab-'+id);const subnav=$('subalbums');subnav.replaceChildren();subnav.hidden=!a.children;let selected=a;if(a.children){selected=a.children.find(c=>c.id===activeSub)||a.children[0];activeSub=selected.id;for(const child of a.children){const b=el('button','subalbum',child.label);b.type='button';b.setAttribute('aria-pressed',String(child.id===activeSub));b.onclick=()=>{selectAlbum(id,child.id);Array.from(subnav.children).find(x=>x.getAttribute('aria-pressed')==='true')?.focus();};subnav.append(b);}}$('album-title').textContent=a.children?a.label+' · '+selected.label:a.label;$('album-description').textContent=descriptions[id];$('count').textContent=selected.images.length+' Bilder';$('gallery').className='grid'+(id==='portraits'?'':' wide');$('gallery').replaceChildren();if(!selected.images.length)$('gallery').append(el('p','empty-album','In diesem Album sind noch keine Bilder.'));for(const image of selected.images)$('gallery').append(photoCard(image));return selected;}
-function openPhoto(image){const current=active==='portraits'&&image.currentUrl;$('large-image').src=current||image.url;$('large-image').alt=image.title+(current?' · 2025':'');$('lightbox-title').textContent=image.title+(current?' · 2025':'');$('lightbox').showModal();}
+function openPhoto(image){
+  const portrait=active==='portraits';
+  const current=portrait&&image.currentUrl;
+  $('large-image').src=current||image.url;
+  $('large-image').alt=image.title+(current?' · 2025':'');
+  $('lightbox-title').textContent=portrait?'Schülerprofil':image.title;
+  const pdf=$('profile-pdf');
+  pdf.replaceChildren();
+  pdf.hidden=!portrait;
+  const hasPdf=portrait&&pdfNames.includes(image.title);
+  $('lightbox').classList.toggle('with-pdf',hasPdf);
+  if(hasPdf){
+    const link=pdfLink(image.title,'PDF in neuem Tab öffnen ↗');
+    pdf.append(link,el('p','','Falls die Vorschau auf deinem Gerät nicht erscheint, öffne die PDF über den Link.'));
+    const frame=el('iframe');
+    frame.title='PDF zum Schülerprofil';
+    frame.src=link.href+'#view=FitH';
+    pdf.append(frame);
+  }else if(portrait){pdf.append(el('p','','Für dieses Profil ist noch keine PDF vorhanden.'));}
+  $('lightbox').showModal();
+}
 function pdfLink(name, label){const link=el('a','pdf-link',label);link.href='FAQ/'+encodeURIComponent(name+'.pdf');link.target='_blank';link.rel='noopener noreferrer';link.setAttribute('aria-label',name+' – PDF in neuem Tab öffnen');return link;}
-function photoCard(image){const card=el('article','card');const figure=el('figure','photo');const button=el('button','image-button');button.type='button';button.setAttribute('aria-label',image.title+(image.currentUrl?' – Foto 2025 öffnen':' vergrößern'));const img=el('img');img.src=image.url;img.alt=image.title;img.loading='lazy';img.decoding='async';button.append(img);button.onclick=()=>openPhoto(image);figure.append(button);card.classList.add('without-comments');if(active!=='portraits')card.classList.add('image-only');else{const caption=el('figcaption','profile-caption');caption.append(el('strong','',image.title));if(pdfNames.includes(image.title))caption.append(pdfLink(image.title,'PDF öffnen ↗'));figure.append(caption);}card.append(figure);return card;}
+function photoCard(image){const card=el('article','card');const figure=el('figure','photo');const button=el('button','image-button');button.type='button';button.setAttribute('aria-label',active==='portraits'?image.title+' – Profil mit Foto und PDF öffnen':image.title+' vergrößern');const img=el('img');img.src=image.url;img.alt=image.title;img.loading='lazy';img.decoding='async';button.append(img);button.onclick=()=>openPhoto(image);figure.append(button);card.classList.add('without-comments');if(active!=='portraits')card.classList.add('image-only');card.append(figure);return card;}
 $('close-lightbox').onclick=()=>$('lightbox').close();$('lightbox').onclick=e=>{if(e.target===$('lightbox'))$('lightbox').close();};
 if(document.modelContext?.registerTool){const lifecycle=new AbortController();addEventListener('pagehide',()=>lifecycle.abort(),{once:true});for(const tool of [{name:'open_photo_album',description:'Öffnet eines der Fotoalben im sichtbaren Album.',inputSchema:{type:'object',properties:{album:{type:'string',enum:['portraits','einschulung','ausfluege','klassenfotos','klassentreffen-2025']},subalbum:{type:'string',enum:['park','rathaus','schule','jcb','goldener-loewe']}},required:['album'],additionalProperties:false},annotations:{readOnlyHint:true},execute:async input=>{const selected=selectAlbum(input.album,input.subalbum);return{album:active,subalbum:selected.id,images:selected.images.map(i=>({id:i.id,title:i.title}))};}}]){try{Promise.resolve(document.modelContext.registerTool(tool,{signal:lifecycle.signal})).catch(()=>{});}catch{}}}
 
 
-$('lightbox').addEventListener('close',()=>{$('large-image').removeAttribute('src');});
+$('lightbox').addEventListener('close',()=>{$('large-image').removeAttribute('src');$('profile-pdf').replaceChildren();$('profile-pdf').hidden=true;$('lightbox').classList.remove('with-pdf');});
 // Only documents verified in the published FAQ folder are linked.
 const pdfNames=['Anett','Anita','Anke','Carsten Wolf','Carsten','Claudia','Eva','Franziska','Heidi','Jan','Kay','Konrad','Maike','Manuela','Rocco','Romy','Ronny','Sandra','Silvio','Stefanie','Thomas','Wenke'];
 const pdfLibrary=el('details','pdf-library');
